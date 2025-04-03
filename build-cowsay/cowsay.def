@@ -1,0 +1,81 @@
+# Apptainer definition file for cowsay
+
+Bootstrap: docker
+From: rockylinux:9
+
+%post
+# Enable debugging to show all commands being executed
+    set -x
+ 
+     # Clean any cached repository data
+    echo "Cleaning dnf cache..."
+    dnf clean all
+    
+    # Refresh the package metadata to ensure the latest updates are available
+    echo "Refreshing package metadata..."
+    dnf -y --refresh update --exclude=filesystem || (echo "dnf update failed"; exit 1)
+    
+    # Install EPEL repository and required packages (e.g., cowsay)
+    echo "Installing epel-release and cowsay..."
+    dnf -y install epel-release || (echo "Failed to install epel-release"; exit 1)
+    dnf -y install cowsay || (echo "Failed to install cowsay"; exit 1)
+    
+    # Create app directory and install software
+    echo "Creating app directory..."
+    mkdir -p /opt/cowsay
+    cd /opt/cowsay
+
+    # Additional installation commands if needed
+    # dnf -y install <other-dependencies>
+    # Install necessary packages, including locale support
+
+    echo "Installing necessary packages..."
+    dnf -y install glibc-locale-source || (echo "Failed to install glibc-locale-source"; exit 1)
+
+    # Generate the en_US.UTF-8 locale
+    echo "Generating en_US.UTF-8 locale..."
+    localedef -i en_US -f UTF-8 en_US.UTF-8 || (echo "Failed to generate en_US.UTF-8 locale"; exit 1)
+    
+    # Set the locale environment variables
+    echo "Setting locale environment variables..."
+    echo 'export LANG=en_US.UTF-8' >> /etc/profile
+    echo 'export LC_ALL=en_US.UTF-8' >> /etc/profile
+    echo 'export LANGUAGE=en_US.UTF-8' >> /etc/profile
+    
+# Disable debugging
+    set +x
+
+%environment
+    export PATH=/opt/cowsay/bin:/usr/local/go/bin:/opt/anaconda/bin:/opt/anaconda/condabin:/usr/local/bin:/opt/anaconda/bin:/opt/rstudio-connect/bin:/home/cazuza/.local/bin:/home/cazuza/bin:/usr/share/Modules/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/home/cazuza/go/bin:/usr/local/go/bin:/home/cazuza/go/bin
+    export LD_LIBRARY_PATH=/opt/cowsay/lib  # Set default if LD_LIBRARY_PATH is unbound
+    export OMP_NUM_THREADS=8
+
+%runscript
+ # Check if arguments are passed to the container
+    if [ $# -gt 0 ]; then
+        # If arguments are provided, pass them to cowsay
+        echo "$@" | cowsay  # Pass the arguments as the message for cowsay
+    else
+        # If no arguments are provided, use a default message
+        echo "No message provided. Using default message."
+        echo "Hello, this is a cowsay container!" | cowsay
+    fi
+
+# %files: If you are not using files to be copied into the container, you can comment this section out.
+# %files
+#     # Copy files into the container (example)
+#     ./config/settings.conf /etc/cowsay/settings.conf
+#     ./data/input_data.dat /data/input_data.dat
+
+%labels
+    Author: YourName
+    Version: 1.0
+    Description: Container for cowsay scientific application
+
+# %test: This section is used for testing the container during build. It can be commented out if not in use.
+%test
+    # Simple test: run cowsay to verify it's working
+    echo "Testing cowsay..." | cowsay
+    # Or, if you want to test a custom message:
+    echo "This is a test message" | cowsay
+
