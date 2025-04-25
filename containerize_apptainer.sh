@@ -9,21 +9,38 @@ if [[ $# -lt 1 ]]; then
     exit 1
 fi
 
-APP_NAME="$1"
-BUILD_FLAG="${2:-}"
-CLUSTER="${3:-}"
+#APP_NAME="$1"
+#BUILD_FLAG="${2:-}"
+#CLUSTER="${3:-}"
 
-BUILD_DIR="build-$APP_NAME"
-DEF_FILE="$BUILD_DIR/$APP_NAME.def"  # The .def file will be created directly under build-$APP_NAME
+#BUILD_DIR="build-$APP_NAME"
+#DEF_FILE="$BUILD_DIR/$APP_NAME.def"  # The .def file will be created directly under build-$APP_NAME
 
 # Create build context (without the $APP_NAME subdirectory)
+#mkdir -p "$BUILD_DIR"
+
+APP_NAME="$1"
+BUILD_FLAG="${2:-}"             # e.g. --build
+BUILD_MODE="${3:-"--sif"}"        # --sif or --sandbox
+
+BUILD_DIR="build-$APP_NAME"
+DEF_FILE="$BUILD_DIR/$APP_NAME.def"
+
+# Decide image path
+if [[ "$BUILD_MODE" == "--sandbox" ]]; then
+    IMAGE_PATH="$BUILD_DIR/$APP_NAME.sandbox"
+else
+    IMAGE_PATH="$APP_NAME.sif"
+fi
+
+# Create build context directory
 mkdir -p "$BUILD_DIR"
 
 # Create the .def file if it doesn't exist
 if [[ ! -f "$DEF_FILE" ]]; then
     echo "Creating $DEF_FILE..."
     cat > "$DEF_FILE" <<EOF
-# Apptainer definition file for $APP_NAME
+## Apptainer definition file for $APP_NAME
 
 Bootstrap: docker
 From: rockylinux:9
@@ -103,15 +120,20 @@ else
     exit 1
 fi
 
-# Build the container if the --build flag is set
+# Build the container
 if [[ "$BUILD_FLAG" == "--build" ]]; then
-    echo "Building container image '$APP_NAME'..."
-    apptainer build "$APP_NAME.sif" "$DEF_FILE"
-    echo "Image '$APP_NAME.sif' built successfully."
+    echo "Building container: $IMAGE_PATH"
+    if [[ "$BUILD_MODE" == "--sandbox" ]]; then
+        echo "Creating Sandbox image at $IMAGE_PATH"    
+        apptainer build --fakeroot --fix-perms --sandbox "$IMAGE_PATH" "$DEF_FILE"
+        echo "Sandbox image created at $IMAGE_PATH"
+    else
+        apptainer build --fakeroot --fix-perms "$IMAGE_PATH" "$DEF_FILE"
+        echo "SIF image created at $IMAGE_PATH"
+    fi
 else
-    echo "Loading $DEF_FILE for editing."
-    sleep 2
-    "$EDITOR" "$DEF_FILE"  # Open the .def file for editing if --build is not specified
+    echo "Opening $DEF_FILE for editing..."
+    sleep 1
+    "${EDITOR:-vi}" "$DEF_FILE"
     exit
 fi
-
